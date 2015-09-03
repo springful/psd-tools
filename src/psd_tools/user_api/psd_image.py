@@ -238,7 +238,7 @@ class Group(_RawLayer):
         return merge_layers(self.layers, respect_visibility=True)
 
     def layers_in_comp(self, comp_id):
-        layers = []
+        layers = super(Group, self).layers_in_comp(comp_id)
         for layer in self.layers:
             layers.extend(layer.layers_in_comp(comp_id))
         return layers
@@ -425,9 +425,6 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
         if layer is None:
             continue
 
-        if layer.bbox.width == 0 and layer.bbox.height == 0:
-            continue
-
         if skip_layer(layer):
             continue
 
@@ -437,7 +434,12 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
         if isinstance(layer, psd_tools.Group):
             layer_image = merge_layers(layer.layers, respect_visibility, skip_layer)
         else:
+            if layer.bbox.width == 0 and layer.bbox.height == 0:
+                continue
             layer_image = layer.as_PIL()
+
+        if layer_image is None:
+            continue
 
         layer_image = pil_support.apply_opacity(layer_image, layer.opacity)
 
