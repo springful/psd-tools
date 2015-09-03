@@ -82,13 +82,60 @@ class _RawLayer(object):
         return self._info.blend_mode
 
     @property
+    def layer_comps(self):
+        layer_comps = []
+        layer_settings = self._layer_settings
+        if layer_settings is None:
+            return layer_comps
+
+        for setting in layer_settings:
+            for item in setting.items:
+                if item[0] == 'compList':
+                    for value in item[1].items:
+                        layer_comps.append(value.value)
+
+        return layer_comps
+
+    def layers_in_comp(self, comp_id):
+        if comp_id in self.layer_comps:
+            return [self]
+        return []
+
+    @property
+    def _layer_settings(self):
+        metadatas = self._tagged_blocks.get(TaggedBlock.METADATA_SETTING)
+        if metadatas is None:
+            return None
+
+        metadata = None
+        for item in metadatas:
+            if item.key == 'cmls':
+                metadata = item
+                break
+        if metadata is None:
+            return None
+
+        layer_settings = None
+        for item in metadata.data.items:
+            if item[0] == 'layerSettings':
+                layer_settings = item[1]
+        if layer_settings is None:
+            return None
+        return layer_settings[0]
+
+    @property
     def _info(self):
+        if self._index is None:
+            return None
         return self._psd._layer_info(self._index)
 
     @property
     def _tagged_blocks(self):
-        return dict(self._info.tagged_blocks)
-
+        info = self._info
+        if info is None:
+            return {}
+        return dict(info.tagged_blocks)
+    
 
 class Layer(_RawLayer):
     """ PSD layer wrapper """
@@ -190,6 +237,12 @@ class Group(_RawLayer):
         """
         return merge_layers(self.layers, respect_visibility=True)
 
+    def layers_in_comp(self, comp_id):
+        layers = []
+        for layer in self.layers:
+            layers.extend(layer.layers_in_comp(comp_id))
+        return layers
+
     def _add_layer(self, child):
         self.layers.append(child)
 
@@ -281,6 +334,10 @@ class PSDImage(object):
         (img.header.width and img.header.heigth).
         """
         return combined_bbox(self.layers)
+
+    def layers_in_comp(self, comp):
+        comp_id = self.layer_comps[comp]
+        return self._fake_root_group.layers_in_comp(comp_id)
 
     def _layer_info(self, index):
         layers = self.decoded_data.layer_and_mask_data.layers.layer_records
