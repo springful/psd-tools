@@ -4,7 +4,7 @@ import logging
 import warnings
 import zlib
 
-from psd_tools.utils import (read_fmt, read_pascal_string,
+from psd_tools.utils import (read_fmt, read_size, read_pascal_string,
                              read_be_array, trimmed_repr, pad, synchronize)
 from psd_tools.exceptions import Error
 from psd_tools.constants import (Compression, Clipping, BlendMode,
@@ -105,17 +105,17 @@ class Block(_Block):
                     p.pretty(self.data)
 
 
-def read(fp, encoding, depth):
+def read(fp, encoding, depth, psb=False):
     """
     Reads layers and masks information.
     """
     logger.debug('reading layers and masks information...')
-    length = read_fmt("I", fp)[0]
+    length = read_size(fp, psb=psb)
     start_pos = fp.tell()
 
     logger.debug('length=%d, start_pos=%d', length, start_pos)
 
-    layers = _read_layers(fp, encoding, depth)
+    layers = _read_layers(fp, encoding, depth, psb=psb)
 
     global_mask_info = None
     tagged_blocks = []
@@ -138,7 +138,7 @@ def read(fp, encoding, depth):
     return LayerAndMaskData(layers, global_mask_info, tagged_blocks)
 
 
-def _read_layers(fp, encoding, depth, length=None):
+def _read_layers(fp, encoding, depth, length=None, psb=False):
     """
     Reads info about layers.
     """
@@ -148,7 +148,7 @@ def _read_layers(fp, encoding, depth, length=None):
     layer_records = []
     channel_image_data = []
     if length is None:
-        length = read_fmt("I", fp)[0]
+        length = read_size(fp, psb=psb)
 
     if length > 0:
         start_pos = fp.tell()
@@ -158,7 +158,7 @@ def _read_layers(fp, encoding, depth, length=None):
 
         for idx in range(abs(layer_count)):
             logger.debug('reading layer record %d, pos=%d', idx, fp.tell())
-            layer = _read_layer_record(fp, encoding)
+            layer = _read_layer_record(fp, encoding, psb=True)
             layer_records.append(layer)
 
         for idx, layer in enumerate(layer_records):
@@ -176,7 +176,7 @@ def _read_layers(fp, encoding, depth, length=None):
     return Layers(length, layer_count, layer_records, channel_image_data)
 
 
-def _read_layer_record(fp, encoding):
+def _read_layer_record(fp, encoding, psb=False):
     """
     Reads single layer record.
     """
@@ -185,8 +185,11 @@ def _read_layer_record(fp, encoding):
                  top, left, bottom, right, num_channels)
 
     channel_info = []
+    channel_info_fmt = "hI"
+    if psb:
+        channel_info_fmt = "hQ"
     for channel_num in range(num_channels):
-        info = ChannelInfo(*read_fmt("hI", fp))
+        info = ChannelInfo(*read_fmt(channel_info_fmt, fp))
         channel_info.append(info)
 
     sig = fp.read(4)

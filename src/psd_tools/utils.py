@@ -24,6 +24,12 @@ def read_fmt(fmt, fp):
     assert len(data) == fmt_size, (len(data), fmt_size)
     return struct.unpack(fmt, data)
 
+def read_size(fp, psb=False):
+    if psb:
+        return read_fmt("Q", fp)[0]
+    else:
+        return read_fmt("I", fp)[0]
+
 def pad(number, divisor):
     if number % divisor:
         number = (number // divisor + 1) * divisor
