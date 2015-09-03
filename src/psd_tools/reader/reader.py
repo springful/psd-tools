@@ -18,10 +18,12 @@ ParseResult = pretty_namedtuple(
 def parse(fp, encoding='utf8'):
 
     header = psd_tools.reader.header.read(fp)
+    psb = header.version == 2
+
     return ParseResult(
         header,
         psd_tools.reader.color_mode_data.read(fp),
         psd_tools.reader.image_resources.read(fp, encoding),
-        psd_tools.reader.layers.read(fp, encoding, header.depth),
+        psd_tools.reader.layers.read(fp, encoding, header.depth, psb=psb),
         psd_tools.reader.layers.read_image_data(fp, header)
     )
