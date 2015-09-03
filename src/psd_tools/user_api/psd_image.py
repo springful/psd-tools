@@ -417,7 +417,7 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
 
 
 def _parse_layer_comps(image_resource_blocks):
-    layer_comps = []
+    layer_comps = {}
 
     comp_block = None
     for resource_block in image_resource_blocks:
@@ -438,6 +438,6 @@ def _parse_layer_comps(image_resource_blocks):
 
     for descriptor in list.items:
         attribute_map = dict(descriptor.items)
-        layer_comps.append(attribute_map['Nm  '].value)
+        layer_comps[attribute_map['Nm  '].value] = attribute_map['compID'].value
 
     return layer_comps
