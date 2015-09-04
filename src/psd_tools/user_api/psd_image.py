@@ -83,21 +83,28 @@ class _RawLayer(object):
 
     @property
     def layer_comps(self):
-        layer_comps = []
+        layer_comps = {}
         layer_settings = self._layer_settings
         if layer_settings is None:
             return layer_comps
 
         for setting in layer_settings:
+            comp_ids = []
+            enab = False
             for item in setting.items:
                 if item[0] == 'compList':
                     for value in item[1].items:
-                        layer_comps.append(value.value)
+                        comp_ids.append(value.value)
+                elif item[0] == 'enab':
+                    enab = item[1].value
+                # TODO(abhishek): Parse positions
+            for comp_id in comp_ids:
+                layer_comps[comp_id] = {'enab': enab}
 
         return layer_comps
 
     def layers_in_comp(self, comp_id):
-        if comp_id in self.layer_comps:
+        if self.layer_comps.get(comp_id, {}).get('enab'):
             return [self]
         return []
 
