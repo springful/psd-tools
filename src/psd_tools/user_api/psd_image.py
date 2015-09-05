@@ -88,9 +88,9 @@ class _RawLayer(object):
         if layer_settings is None:
             return layer_comps
 
+        enab = None
         for setting in layer_settings:
             comp_ids = []
-            enab = False
             for item in setting.items:
                 if item[0] == 'compList':
                     for value in item[1].items:
@@ -99,14 +99,14 @@ class _RawLayer(object):
                     enab = item[1].value
                 # TODO(abhishek): Parse positions
             for comp_id in comp_ids:
-                layer_comps[comp_id] = {'enab': enab}
+                layer_comps[comp_id] = {}
+                if enab is not None:
+                    layer_comps[comp_id]['enab'] = enab
 
         return layer_comps
 
-    def layers_in_comp(self, comp_id):
-        if self.layer_comps.get(comp_id, {}).get('enab'):
-            return [self]
-        return []
+    def visible_in_comp(self, comp_id):
+        return self.layer_comps.get(comp_id, {}).get('enab')
 
     @property
     def _layer_settings(self):
@@ -244,12 +244,6 @@ class Group(_RawLayer):
         """
         return merge_layers(self.layers, respect_visibility=True)
 
-    def layers_in_comp(self, comp_id):
-        layers = super(Group, self).layers_in_comp(comp_id)
-        for layer in self.layers:
-            layers.extend(layer.layers_in_comp(comp_id))
-        return layers
-
     def _add_layer(self, child):
         self.layers.append(child)
 
@@ -325,6 +319,10 @@ class PSDImage(object):
         bbox = BBox(0, 0, self.header.width, self.header.height)
         return merge_layers(self.layers, bbox=bbox)
 
+    def comp_as_PIL(self, comp):
+        bbox = BBox(0, 0, self.header.width, self.header.height)
+        return merge_layers(self.layers, bbox=bbox, comp_id=self.layer_comps.get(comp))
+
     def as_pymaging(self):
         """
         Returns a pymaging.Image for this PSD file.
@@ -341,10 +339,6 @@ class PSDImage(object):
         (img.header.width and img.header.heigth).
         """
         return combined_bbox(self.layers)
-
-    def layers_in_comp(self, comp):
-        comp_id = self.layer_comps[comp]
-        return self._fake_root_group.layers_in_comp(comp_id)
 
     def _layer_info(self, index):
         layers = self.decoded_data.layer_and_mask_data.layers.layer_records
@@ -396,7 +390,8 @@ def combined_bbox(layers):
     return BBox(min(lefts), min(tops), max(rights), max(bottoms))
 
 
-def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False, bbox=None):
+def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False, bbox=None,
+                 comp_id=None):
     """
     Merges layers together (the first layer is on top).
 
@@ -435,11 +430,17 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
         if skip_layer(layer):
             continue
 
-        if not layer.visible and respect_visibility:
-            continue
+        if respect_visibility:
+            if comp_id:
+                if not layer.visible_in_comp(comp_id):
+                    continue
+            else:
+                if not layer.visible:
+                    continue
 
         if isinstance(layer, psd_tools.Group):
-            layer_image = merge_layers(layer.layers, respect_visibility, skip_layer)
+            layer_image = merge_layers(layer.layers, respect_visibility, skip_layer,
+                                       comp_id=comp_id)
         else:
             if layer.bbox.width == 0 and layer.bbox.height == 0:
                 continue
