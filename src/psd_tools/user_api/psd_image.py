@@ -82,13 +82,67 @@ class _RawLayer(object):
         return self._info.blend_mode
 
     @property
+    def layer_comps(self):
+        layer_comps = {}
+        layer_settings = self._layer_settings
+        if layer_settings is None:
+            return layer_comps
+
+        enab = None
+        for setting in layer_settings:
+            comp_ids = []
+            for item in setting.items:
+                if item[0] == 'compList':
+                    for value in item[1].items:
+                        comp_ids.append(value.value)
+                elif item[0] == 'enab':
+                    enab = item[1].value
+                # TODO(abhishek): Parse positions
+            for comp_id in comp_ids:
+                layer_comps[comp_id] = {}
+                if enab is not None:
+                    layer_comps[comp_id]['enab'] = enab
+
+        return layer_comps
+
+    def visible_in_comp(self, comp_id):
+        return self.layer_comps.get(comp_id, {}).get('enab')
+
+    @property
+    def _layer_settings(self):
+        metadatas = self._tagged_blocks.get(TaggedBlock.METADATA_SETTING)
+        if metadatas is None:
+            return None
+
+        metadata = None
+        for item in metadatas:
+            if item.key == 'cmls':
+                metadata = item
+                break
+        if metadata is None:
+            return None
+
+        layer_settings = None
+        for item in metadata.data.items:
+            if item[0] == 'layerSettings':
+                layer_settings = item[1]
+        if layer_settings is None:
+            return None
+        return layer_settings[0]
+
+    @property
     def _info(self):
+        if self._index is None:
+            return None
         return self._psd._layer_info(self._index)
 
     @property
     def _tagged_blocks(self):
-        return dict(self._info.tagged_blocks)
-
+        info = self._info
+        if info is None:
+            return {}
+        return dict(info.tagged_blocks)
+    
 
 class Layer(_RawLayer):
     """ PSD layer wrapper """
@@ -265,6 +319,10 @@ class PSDImage(object):
         bbox = BBox(0, 0, self.header.width, self.header.height)
         return merge_layers(self.layers, bbox=bbox)
 
+    def comp_as_PIL(self, comp):
+        bbox = BBox(0, 0, self.header.width, self.header.height)
+        return merge_layers(self.layers, bbox=bbox, comp_id=self.layer_comps.get(comp))
+
     def as_pymaging(self):
         """
         Returns a pymaging.Image for this PSD file.
@@ -332,7 +390,8 @@ def combined_bbox(layers):
     return BBox(min(lefts), min(tops), max(rights), max(bottoms))
 
 
-def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False, bbox=None):
+def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False, bbox=None,
+                 comp_id=None):
     """
     Merges layers together (the first layer is on top).
 
@@ -368,19 +427,27 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
         if layer is None:
             continue
 
-        if layer.bbox.width == 0 and layer.bbox.height == 0:
-            continue
-
         if skip_layer(layer):
             continue
 
-        if not layer.visible and respect_visibility:
-            continue
+        if respect_visibility:
+            if comp_id:
+                if not layer.visible_in_comp(comp_id):
+                    continue
+            else:
+                if not layer.visible:
+                    continue
 
         if isinstance(layer, psd_tools.Group):
-            layer_image = merge_layers(layer.layers, respect_visibility, skip_layer)
+            layer_image = merge_layers(layer.layers, respect_visibility, skip_layer,
+                                       comp_id=comp_id)
         else:
+            if layer.bbox.width == 0 and layer.bbox.height == 0:
+                continue
             layer_image = layer.as_PIL()
+
+        if layer_image is None:
+            continue
 
         layer_image = pil_support.apply_opacity(layer_image, layer.opacity)
 
