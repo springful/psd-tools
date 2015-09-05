@@ -88,6 +88,8 @@ class _RawLayer(object):
         if layer_settings is None:
             return layer_comps
 
+        # enab is stored sparsely so pervious values should carry through to the next comps if a
+        # new value is not provided
         enab = None
         for setting in layer_settings:
             comp_ids = []
