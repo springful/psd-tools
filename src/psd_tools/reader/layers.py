@@ -158,7 +158,7 @@ def _read_layers(fp, encoding, depth, length=None, psb=False):
 
         for idx in range(abs(layer_count)):
             logger.debug('reading layer record %d, pos=%d', idx, fp.tell())
-            layer = _read_layer_record(fp, encoding, psb=True)
+            layer = _read_layer_record(fp, encoding, psb=psb)
             layer_records.append(layer)
 
         for idx, layer in enumerate(layer_records):
