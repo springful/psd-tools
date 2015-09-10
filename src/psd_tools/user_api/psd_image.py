@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals, division
 
+import io
 import logging
 import collections
 import weakref              # FIXME: there should be weakrefs in this module
@@ -285,6 +286,7 @@ class PSDImage(object):
         self._fake_root_group = root
         self.layers = root.layers
         self.embedded = [Embedded(linked) for linked in self._linked_layer_iter()]
+        self.embedded_images = [PSDImage.from_stream(io.BytesIO(e.data)) for e in self.embedded]
 
         self.layer_comps = _parse_layer_comps(decoded_data.image_resource_blocks)
 

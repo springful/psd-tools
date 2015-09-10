@@ -158,12 +158,12 @@ def _read_layers(fp, encoding, depth, length=None, psb=False):
 
         for idx in range(abs(layer_count)):
             logger.debug('reading layer record %d, pos=%d', idx, fp.tell())
-            layer = _read_layer_record(fp, encoding, psb=True)
+            layer = _read_layer_record(fp, encoding, psb=psb)
             layer_records.append(layer)
 
         for idx, layer in enumerate(layer_records):
             logger.debug('reading layer channel data %d, pos=%d', idx, fp.tell())
-            data = _read_channel_image_data(fp, layer, depth)
+            data = _read_channel_image_data(fp, layer, depth, psb=psb)
             channel_image_data.append(data)
 
         remaining_length = length - (fp.tell() - start_pos)
@@ -331,7 +331,7 @@ def _read_layer_blending_ranges(fp):
     return LayerBlendingRanges(composite_ranges, channel_ranges)
 
 
-def _read_channel_image_data(fp, layer, depth):
+def _read_channel_image_data(fp, layer, depth, psb):
     """
     Reads image data for all channels in a layer.
     """
@@ -362,7 +362,11 @@ def _read_channel_image_data(fp, layer, depth):
             logger.debug('    data size = %sx%sx%s=%s bytes', w, h, bytes_per_pixel, data_size)
 
         elif compress_type == Compression.PACK_BITS:
-            byte_counts = read_be_array("H", h, fp)
+            if psb:
+                fmt = "I"
+            else:
+                fmt = "H"
+            byte_counts = read_be_array(fmt, h, fp)
             data_size = sum(byte_counts)
             logger.debug('    data size = %s bytes', data_size)
 
