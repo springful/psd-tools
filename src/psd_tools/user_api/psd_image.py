@@ -83,7 +83,7 @@ class _RawLayer(object):
 
     @property
     def layer_comps(self):
-        layer_comps = {}
+        layer_comps = collections.OrderedDict()
         layer_settings = self._layer_settings
         if layer_settings is None:
             return layer_comps
@@ -486,7 +486,7 @@ def merge_layers(layers, respect_visibility=True, skip_layer=lambda layer: False
 
 
 def _parse_layer_comps(image_resource_blocks):
-    layer_comps = {}
+    layer_comps = collections.OrderedDict()
 
     comp_block = None
     for resource_block in image_resource_blocks:
